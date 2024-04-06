@@ -8,6 +8,10 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+import { ResolveConfigFn, instrument } from '@microlabs/otel-cf-workers';
+import { trace } from '@opentelemetry/api';
+import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
+
 export interface Env {
 	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
 	// MY_KV_NAMESPACE: KVNamespace;
@@ -25,8 +29,20 @@ export interface Env {
 	// MY_QUEUE: Queue;
 }
 
-export default {
+const handler = {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const span = trace.getActiveSpan();
+		console.log('Active span context:', span?.spanContext());
+		await fetch('https://google.com');
 		return new Response('Hello World!');
 	},
 };
+
+const config: ResolveConfigFn = (env: Env, _trigger) => {
+	return {
+		exporter: new ConsoleSpanExporter(),
+		service: { name: 'otel-broken-test' },
+	};
+};
+
+export default instrument(handler, config);
